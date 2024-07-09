@@ -2,11 +2,14 @@ import { swaggerUI } from '@hono/swagger-ui';
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
 
+// Import string similarity for related markets
+import { stringSimilarity } from "string-similarity-js";
+
 // Import Exa
 import Exa from 'exa-js';
 
 // Import Scrape
-import { fetchAndCombineJsonFiles } from './scrape';
+import { fetchAndCombineJsonFiles } from './scrape.ts';
 
 const app = new OpenAPIHono()
 app.use('/api/*', cors({ origin: '*' }));
@@ -39,6 +42,11 @@ const NewsSchema = z.object({
 const AllMarketsSchema = z.object({
 	index: z.string().optional().openapi({
 		example: '101'
+	})
+})
+const MarketsByHeadline = z.object({
+	headline: z.string().openapi({
+		example: 'Will the winner of the 2024 USA presidential election win Pennsylvania?'
 	})
 })
 
@@ -85,6 +93,27 @@ const allMarketsRoute = createRoute({
 	}
 });
 
+const marketsByHeadlineRoute = createRoute({
+	method: 'get',
+	path: '/api/markets/headline/{headline}',
+	description: 'Get related markets by headline',
+	request: {
+		params: MarketsByHeadline,
+	},
+	responses: {
+		200: {
+			description: 'Get related markets by headline',
+			content: {
+				'application/json': {
+					schema: z.object({
+						result: z.string()
+					})
+				}
+			}
+		}
+	}
+});
+
 // --- Consume the OpenAPI Routes ---
 app.openapi(newsRoute, async (c) => {
 	const exa = new Exa(c.env.EXA_API_KEY);
@@ -99,12 +128,18 @@ app.openapi(newsRoute, async (c) => {
 
 	// Fetch news for the given market
 	const results = await exa.search(market, {
-		useAutoprompt: false,
-		type: 'keyword',
-		endCrawlDate: startDate.toISOString(),
-		endPublishedDate: endDate.toISOString(),
-		startCrawlDate: startDate.toISOString(),
-		startPublishedDate: endDate.toISOString(),
+		  type: "neural",
+		  useAutoprompt: true,
+		  numResults: 10,
+		//   text: {
+		// 	includeHtmlTags: true
+		//   }// use to enable text content
+		  category: "news",
+		  startCrawlDate: startDate.toISOString(),
+		  endCrawlDate: endDate.toISOString(),
+		  startPublishedDate: startDate.toISOString(),
+		  endPublishedDate: endDate.toISOString(),
+		  excludeDomains: ["kalshi.com", "metaculus.com", "manifold.markets", "polymarket.com"]
 	}).catch((error) => {
 		c.status(500)
 		return ["An error occurred while fetching news articles. Please try again later."];
@@ -124,10 +159,29 @@ app.openapi(allMarketsRoute, async (c) => {
 	};
 
     const markets = await fetchAndCombineJsonFiles();
-
 	const slicedMarkets = markets?.slice(number, number + 100);
 
     return c.json(slicedMarkets);
+});
+
+function formatMarketTitle(title) {
+    return title
+        .replace(/-/g, ' ')
+        .toLowerCase()
+        .replace(/\b\w/g, l => l.toUpperCase());
+}
+
+app.openapi(marketsByHeadlineRoute, async (c) => {
+	const { headline } = c.req.param();
+    const markets = await fetchAndCombineJsonFiles();
+
+	const similarMarkets = markets?.filter(market => {  
+		const formattedMarketTitle = formatMarketTitle(market.Question.Title);
+		const similarity = stringSimilarity(headline, formattedMarketTitle, 1);
+		return similarity > 0.90; // adjust this threshold as needed
+	});
+
+    return c.json(similarMarkets?.length > 0 ? similarMarkets?.slice(0, 3) : "No related markets. Explore at https://data.adj.news");
 });
 
 export default app;
