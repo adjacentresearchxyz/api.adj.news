@@ -1,0 +1,50 @@
+{
+  "name": "Adjacent News API",
+  "logo": {
+    "dark": "images/logo.jpg",
+    "light": "images/logo.jpg"
+  },
+  "favicon": "images/logo.svg",
+  "colors": {
+    "primary": "#0D9373",
+    "light": "#07C983",
+    "dark": "#0D9373",
+    "anchors": {
+      "from": "#0D9373",
+      "to": "#07C983"
+    }
+  },
+  "topbarLinks": [
+    {
+      "name": "Support",
+      "url": "mailto:lucas@adj.news"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Reader",
+    "url": "https://adj.news/feed"
+  },
+  "anchors": [
+    {
+      "name": "API Reference",
+      "openapi": "https://api.data.adj.news/doc",
+      "url": "api-reference",
+      "icon": "square-terminal"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "API Reference",
+      "pages": [
+        "get-apimarkets",
+        "get-apinews",
+        "get-apimarketsheadline"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "website": "https://adj.news",
+    "x": "https://x.com/adjacent___",
+    "github": "https://github.com/adjacentresearchxyz"
+  }
+}

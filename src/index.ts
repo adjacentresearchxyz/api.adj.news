@@ -19,11 +19,17 @@ app.get('/ui', swaggerUI({ url: '/doc' }))
 
 // Define the OpenAPI spec
 app.doc('/doc', {
-	info: {
-		title: 'Adjacent News API',
-		version: 'v1',
-	},
-	openapi: '3.1.0'
+    info: {
+        title: 'Adjacent News API',
+        version: 'v1',
+    },
+    openapi: '3.1.0',
+    servers: [
+        {
+            url: 'https://api.data.adj.news',
+            description: 'Production API server'
+        }
+    ]
 })
 
 // redirect to ui
@@ -40,7 +46,7 @@ const NewsSchema = z.object({
 })
 
 const AllMarketsSchema = z.object({
-	index: z.string().optional().openapi({
+	index: z.string().openapi({
 		example: '101'
 	})
 })
@@ -73,24 +79,33 @@ const newsRoute = createRoute({
 });
 
 const allMarketsRoute = createRoute({
-	method: 'get',
-	path: '/api/markets/{index}',
-	description: 'Get all markets, returns 100 at a time.',
-	request: {
-		params: AllMarketsSchema,
-	},
-	responses: {
-		200: {
-			description: 'Get All Markets',
-			content: {
-				'application/json': {
-					schema: z.object({
-						result: z.string()
-					})
-				}
-			}
-		}
-	}
+    method: 'get',
+    path: '/api/markets/{index}',
+    description: 'Get all markets, returns 100 at a time.',
+    request: {
+        params: AllMarketsSchema.openapi({
+            required: false, // Explicitly mark the parameter as optional
+            properties: {
+                index: {
+                    type: 'string', // Ensure the type matches your expected parameter type
+                    example: '101',
+                    description: 'Index for pagination, optional.'
+                }
+            }
+        }),
+    },
+    responses: {
+        200: {
+            description: 'Get All Markets',
+            content: {
+                'application/json': {
+                    schema: z.object({
+                        result: z.string()
+                    })
+                }
+            }
+        }
+    }
 });
 
 const marketsByHeadlineRoute = createRoute({
