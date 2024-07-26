@@ -27,7 +27,7 @@
   "anchors": [
     {
       "name": "API Reference",
-      "openapi": "https://api.data.adj.news/doc",
+      "openapi": "/openapi.json",
       "url": "api-reference",
       "icon": "square-terminal"
     }
