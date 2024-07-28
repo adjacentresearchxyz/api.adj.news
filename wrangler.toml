@@ -1,6 +1,3 @@
 name = "api-adj-news"
 main = "src/index.ts"
 compatibility_date = "2022-11-28"
-
-[vars]
-EXA_API_KEY = '8419346d-fcca-4911-a8d5-08cbe5f51778'
