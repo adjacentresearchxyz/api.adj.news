@@ -36,7 +36,7 @@
     {
       "group": "API Reference",
       "pages": [
-        "get-apimarkets",
+        "Markets",
         "get-apinews",
         "get-apimarketsheadline"
       ]

@@ -21,7 +21,6 @@
     "paths": {
       "/api/news/{market}": {
         "get": {
-          "name": "News",
           "description": "Get news articles for the given market",
           "parameters": [
             {
