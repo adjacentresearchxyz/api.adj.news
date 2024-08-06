@@ -212,9 +212,6 @@ function useRelatedMarkets(embedding, env) {
 app.openapi(marketsByHeadlineRoute, async (c) => {
 	const { headline } = c.req.param();
 
-	// Prepare the data for the POST request
-	const postData = JSON.stringify({ name: headline });
-
 	// Define the URL and headers for the Supabase function call
 	const url = 'https://fyeyeurwgxklumxgpcgz.supabase.co/functions/v1/embed';
 	const headers = {
@@ -227,7 +224,7 @@ app.openapi(marketsByHeadlineRoute, async (c) => {
 		const response = await fetch(url, {
 			method: 'POST',
 			headers: headers,
-			body: postData
+			body: JSON.stringify({ input: headline }),
 		});
 
 		if (!response.ok) {

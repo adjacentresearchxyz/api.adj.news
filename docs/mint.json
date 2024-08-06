@@ -24,14 +24,6 @@
     "name": "Reader",
     "url": "https://adj.news/feed"
   },
-  "anchors": [
-    {
-      "name": "API Reference",
-      "openapi": "/openapi.json",
-      "url": "api-reference",
-      "icon": "square-terminal"
-    }
-  ],
   "navigation": [
     {
       "group": "API Reference",
