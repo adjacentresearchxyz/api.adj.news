@@ -1,28 +1,53 @@
 import { swaggerUI } from '@hono/swagger-ui';
 import { OpenAPIHono, createRoute, z } from '@hono/zod-openapi';
 import { cors } from 'hono/cors';
-
-import { createClient } from '@supabase/supabase-js'
-
-// Import Exa
+import { createClient } from '@supabase/supabase-js';
 import Exa from 'exa-js';
-
-// Import Scrape
 import { fetchAndCombineJsonFiles } from './scrape.ts';
 
+// Environment interface
 export interface Env {
 	EXA_API_KEY: string;
 	SUPABASE_URL: string;
 	SUPABASE_ANON_KEY: string;
 }
 
-const app = new OpenAPIHono()
+// Initialize app
+const app = new OpenAPIHono<Env>();
+
+// Middleware
 app.use('/api/*', cors({ origin: '*' }));
+app.use('/api/*', async (c, next) => {
+	const apiKey = c.req.header('X-API-Key');
+	if (!apiKey) {
+		return c.json({ error: 'API key is required' }, 401);
+	}
 
-// Use the middleware to serve Swagger UI at /ui
-app.get('/ui', swaggerUI({ url: '/doc' }))
+	const supabase = createClient(c.env.SUPABASE_URL, c.env.SUPABASE_ANON_KEY);
 
-// Define the OpenAPI spec
+	// Query the users table for the provided API key
+	const { data, error } = await supabase
+		.from('user')
+		.select('plan')
+		.eq('api_key', apiKey)
+		.single()
+
+	if (error || !data) {
+		return c.json({ error: 'Invalid API key' }, 401);
+	}
+
+	if (data.plan !== 'pro') {
+		return c.json({ error: 'This API is only available for pro users' }, 403);
+	}
+
+	await next();
+});
+
+// Swagger UI
+app.get('/ui', swaggerUI({ url: '/doc' }));
+app.get('/', (c) => c.redirect('/ui'));
+
+// OpenAPI documentation
 app.doc('/doc', {
 	info: {
 		title: 'Adjacent News API',
@@ -32,42 +57,90 @@ app.doc('/doc', {
 	servers: [
 		{
 			url: 'https://api.data.adj.news',
-			description: 'Production API server'
-		}
-	]
-})
-
-// redirect to ui
-app.get("/", c => c.redirect('/ui'));
-
-// 404 for everything else
-app.notFound(c => c.text('Not found', 404));
-
-// --- Define the OpenAPI Schema ---
+			description: 'Production API server',
+		},
+	],
+});
+// Updated Schemas
 const NewsSchema = z.object({
 	market: z.string().openapi({
 		example: 'Will the winner of the 2024 USA presidential election win Pennsylvania?',
-	})
-})
+	}),
+	startDate: z.string().optional().openapi({
+		example: '2024-08-01',
+		description: 'Start date for news articles (YYYY-MM-DD)',
+	}),
+	endDate: z.string().optional().openapi({
+		example: '2024-08-07',
+		description: 'End date for news articles (YYYY-MM-DD)',
+	}),
+	numResults: z.number().optional().openapi({
+		example: 10,
+		description: 'Number of results to return (default: 10, max: 50)',
+	}),
+}).openapi({
+	'x-api-key': {
+		in: 'header',
+		name: 'X-API-Key',
+		required: true,
+	},
+});
 
 const AllMarketsSchema = z.object({
-	index: z.string().openapi({
-		example: '101'
-	})
-})
+	index: z.string().optional().openapi({
+		example: '101',
+		description: 'Index for pagination, optional.',
+	}),
+	platform: z.string().optional().openapi({
+		example: 'Kalshi',
+		description: 'Filter markets by platform',
+	}),
+	status: z.string().optional().openapi({
+		example: 'active',
+		description: 'Filter markets by status (e.g., active, finalized)',
+	}),
+	category: z.string().optional().openapi({
+		example: 'Politics',
+		description: 'Filter markets by category',
+	}),
+}).openapi({
+	'x-api-key': {
+		in: 'header',
+		name: 'X-API-Key',
+		required: true,
+	},
+});
+
 const MarketsByHeadline = z.object({
 	headline: z.string().openapi({
-		example: 'Will the winner of the 2024 USA presidential election win Pennsylvania?'
-	})
-})
+		example: 'Will the winner of the 2024 USA presidential election win Pennsylvania?',
+	}),
+	matchThreshold: z.number().optional().openapi({
+		example: 0.8,
+		description: 'Matching threshold for related markets (0.0 to 1.0)',
+	}),
+	matchCount: z.number().optional().openapi({
+		example: 3,
+		description: 'Number of related markets to return',
+	}),
+}).openapi({
+	'x-api-key': {
+		in: 'header',
+		name: 'X-API-Key',
+		required: true,
+	},
+});
 
-// --- Define the OpenAPI Route ---
+// Updated Route definitions
 const newsRoute = createRoute({
 	method: 'get',
 	path: '/api/news/{market}',
 	description: 'Get news articles for the given market',
 	request: {
 		params: NewsSchema,
+		headers: {
+			'x-api-key': z.string().nonempty().description('Your API key'),
+		},
 	},
 	responses: {
 		200: {
@@ -75,12 +148,12 @@ const newsRoute = createRoute({
 			content: {
 				'application/json': {
 					schema: z.object({
-						result: z.string()
-					})
-				}
-			}
-		}
-	}
+						result: z.string(),
+					}),
+				},
+			},
+		},
+	},
 });
 
 const allMarketsRoute = createRoute({
@@ -88,16 +161,10 @@ const allMarketsRoute = createRoute({
 	path: '/api/markets/{index}',
 	description: 'Get all markets, returns 100 at a time.',
 	request: {
-		params: AllMarketsSchema.openapi({
-			required: false, // Explicitly mark the parameter as optional
-			properties: {
-				index: {
-					type: 'string', // Ensure the type matches your expected parameter type
-					example: '101',
-					description: 'Index for pagination, optional.'
-				}
-			}
-		}),
+		params: AllMarketsSchema,
+		headers: {
+			'x-api-key': z.string().nonempty().description('Your API key'),
+		},
 	},
 	responses: {
 		200: {
@@ -105,12 +172,12 @@ const allMarketsRoute = createRoute({
 			content: {
 				'application/json': {
 					schema: z.object({
-						result: z.string()
-					})
-				}
-			}
-		}
-	}
+						result: z.string(),
+					}),
+				},
+			},
+		},
+	},
 });
 
 const marketsByHeadlineRoute = createRoute({
@@ -119,6 +186,9 @@ const marketsByHeadlineRoute = createRoute({
 	description: 'Get related markets by headline',
 	request: {
 		params: MarketsByHeadline,
+		headers: {
+			'x-api-key': z.string().nonempty().description('Your API key'),
+		},
 	},
 	responses: {
 		200: {
@@ -126,101 +196,70 @@ const marketsByHeadlineRoute = createRoute({
 			content: {
 				'application/json': {
 					schema: z.object({
-						result: z.string()
-					})
-				}
-			}
-		}
+						result: z.string(),
+					}),
+				},
+			},
+		},
+	},
+});
+
+// Updated Route handlers
+app.openapi(newsRoute, async (c) => {
+	const exa = new Exa(c.env.EXA_API_KEY);
+	const { market, startDate, endDate, numResults } = c.req.param();
+	const endDateObj = endDate ? new Date(endDate) : new Date();
+	const startDateObj = startDate ? new Date(startDate) : new Date(endDateObj);
+	startDateObj.setDate(startDateObj.getDate() - 7);
+
+	try {
+		const results = await exa.search(market, {
+			type: "neural",
+			useAutoprompt: true,
+			numResults: Math.min(numResults || 10, 50),
+			category: "news",
+			startCrawlDate: startDateObj.toISOString(),
+			endCrawlDate: endDateObj.toISOString(),
+			startPublishedDate: startDateObj.toISOString(),
+			endPublishedDate: endDateObj.toISOString(),
+			excludeDomains: ["kalshi.com", "metaculus.com", "manifold.markets", "polymarket.com"]
+		});
+		return c.json(results);
+	} catch (error) {
+		c.status(500);
+		return c.json({ error: "An error occurred while fetching news articles. Please try again later." });
 	}
 });
 
-// --- Consume the OpenAPI Routes ---
-app.openapi(newsRoute, async (c) => {
-	const exa = new Exa(c.env.EXA_API_KEY);
-
-	// Retrieve the validated search parameters
-	const { market } = c.req.param();
-
-	// Get the current date and the date one week ago
-	const endDate = new Date();
-	const startDate = new Date();
-	startDate.setDate(startDate.getDate() - 7);
-
-	// Fetch news for the given market
-	const results = await exa.search(market, {
-		type: "neural",
-		useAutoprompt: true,
-		numResults: 10,
-		//   text: {
-		// 	includeHtmlTags: true
-		//   }// use to enable text content
-		category: "news",
-		startCrawlDate: startDate.toISOString(),
-		endCrawlDate: endDate.toISOString(),
-		startPublishedDate: startDate.toISOString(),
-		endPublishedDate: endDate.toISOString(),
-		excludeDomains: ["kalshi.com", "metaculus.com", "manifold.markets", "polymarket.com"]
-	}).catch((error) => {
-		c.status(500)
-		return ["An error occurred while fetching news articles. Please try again later."];
-	});
-
-	// Return the results
-	return c.json(results);
-});
-
 app.openapi(allMarketsRoute, async (c) => {
-	const { index } = c.req.param();
-	let number;
-	if (!index) {
-		number = 0;
-	} else {
-		number = parseInt(index);
-	};
+	const { index, platform, status, category } = c.req.param();
+	const startIndex = index ? parseInt(index) : 0;
+	let markets = await fetchAndCombineJsonFiles();
 
-	const markets = await fetchAndCombineJsonFiles();
-	const slicedMarkets = markets?.slice(number, number + 100);
+	// Apply filters
+	if (platform) {
+		markets = markets.filter(market => market.Platform === platform);
+	}
+	if (status) {
+		markets = markets.filter(market => market.Status === status);
+	}
+	if (category) {
+		markets = markets.filter(market => market.Category === category);
+	}
 
+	const slicedMarkets = markets?.slice(startIndex, startIndex + 100);
 	return c.json(slicedMarkets);
 });
 
-function formatMarketTitle(title) {
-	return title
-		.replace(/-/g, ' ')
-		.toLowerCase()
-		.replace(/\b\w/g, l => l.toUpperCase());
-}
-
-function useRelatedMarkets(embedding, env) {
-	const supabase = createClient(
-		env.SUPABASE_URL,
-		env.SUPABASE_ANON_KEY
-	);
-
-	return supabase.rpc('match_documents', {
-		query_embedding: embedding.embedding, // pass the query embedding
-		match_threshold: 0.803, // choose an appropriate threshold for your data
-		match_count: 3, // choose the number of matches
-	}).then(({ data: documents }) => {
-		return documents;
-	}).catch(error => {
-		console.error(error);
-		return [];
-	});
-}
-
 app.openapi(marketsByHeadlineRoute, async (c) => {
-	const { headline } = c.req.param();
-
-	// Define the URL and headers for the Supabase function call
+	const { headline, matchThreshold, matchCount } = c.req.param();
 	const url = 'https://fyeyeurwgxklumxgpcgz.supabase.co/functions/v1/embed';
 	const headers = {
 		'Content-Type': 'application/json',
-		'Authorization': `Bearer ${c.env?.SUPABASE_ANON_KEY}`
+		'Authorization': `Bearer ${c.env.SUPABASE_ANON_KEY}`
 	};
 
 	try {
-		// Make the POST request to the Supabase function
 		const response = await fetch(url, {
 			method: 'POST',
 			headers: headers,
@@ -231,15 +270,9 @@ app.openapi(marketsByHeadlineRoute, async (c) => {
 			throw new Error(`HTTP error! status: ${response.status}`);
 		}
 
-		// Extract the embedding from the response
 		const embedding = await response.json();
-
-		// Use the embedding with the related markets function
-		let markets = await useRelatedMarkets(embedding, c.env);
-		markets = markets.map(market => {
-			const { question_embedding, ...rest } = market;
-			return rest;
-		});
+		let markets = await useRelatedMarkets(embedding, c.env, matchThreshold, matchCount);
+		markets = markets.map(({ question_embedding, ...rest }) => rest);
 
 		return c.json(markets?.length > 0 ? markets : "No related markets. Explore at https://data.adj.news");
 	} catch (error) {
@@ -247,5 +280,22 @@ app.openapi(marketsByHeadlineRoute, async (c) => {
 		return c.json("Error processing your request. Please try again later.");
 	}
 });
+
+// Updated helper function
+function useRelatedMarkets(embedding, env, matchThreshold = 0.803, matchCount = 3) {
+	const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY);
+	return supabase.rpc('match_documents', {
+		query_embedding: embedding.embedding,
+		match_threshold: matchThreshold,
+		match_count: matchCount,
+	}).then(({ data: documents }) => documents)
+		.catch(error => {
+			console.error(error);
+			return [];
+		});
+}
+
+// 404 handler
+app.notFound(c => c.text('Not found', 404));
 
 export default app;
