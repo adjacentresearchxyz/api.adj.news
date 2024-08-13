@@ -30,7 +30,9 @@
       "pages": [
         "get-apimarkets",
         "get-apinews",
-        "get-apimarketsheadline"
+        "get-apimarketsheadline",
+        "get-apinewsbymarket",
+        "get-apirelatedmarkets"
       ]
     }
   ],
