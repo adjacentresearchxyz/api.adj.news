@@ -26,6 +26,12 @@
   },
   "navigation": [
     {
+        "group": "Getting Started",
+        "pages": [
+            "index"
+        ]
+    },
+    {
       "group": "API Reference",
       "pages": [
         "get-apimarkets",
@@ -42,3 +48,4 @@
     "github": "https://github.com/adjacentresearchxyz"
   }
 }
+
