@@ -21,8 +21,8 @@
     }
   ],
   "topbarCtaButton": {
-    "name": "Reader",
-    "url": "https://adj.news/feed"
+    "name": "News",
+    "url": "https://adj.news/"
   },
   "navigation": [
     {
