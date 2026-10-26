@@ -1,0 +1,66 @@
+---
+title: 'Index and rate candles'
+description: 'OHLC candles over published index and reference-rate levels'
+---
+
+Candles bucket the published index or rate level series into open, high, low, and close. They are calculated levels, not venue trades, so a candle has no bid, ask, or volume.
+
+`timestamp` is the end of the bucket, in UTC, the same convention as market candles. `1min`, `5min`, and `1hour` buckets align to UTC. `1d` buckets use US Eastern midnights (the same day boundary as price history) and `timestamp` is the following Eastern midnight. A bucket with no level is omitted.
+
+Official daily values (`/daily-values`) are a separate series and are not changed.
+
+Price history stamps the start of a bucket and returns that bucket's last level. A candle stamps the end of the bucket. One hourly level at `2026-10-26T12:00:00Z` is the candle that ends at `2026-10-26T13:00:00Z`.
+
+## Routes
+
+| Tier | Index | Reference rate |
+| --- | --- | --- |
+| Public, 15-minute delayed, no credential | `GET /api/v1/public/indices/{id}/candles` | `GET /api/v1/public/rates/{id}/candles` |
+| Authenticated, same credential as price history | `GET /api/v1/indices/{id}/candles` | `GET /api/v1/rates/{id}/candles` |
+
+Public `interval` is `1hour` (30-day window, the default) or `1d` (90-day window). `daily` and `1day` are aliases of `1d`.
+
+Authenticated `interval` is `1min`, `5min` (the default), `1hour`, or `1d`, with the same aliases. Realtime history uses the price route's plan gate. A Pro or Premium refusal is returned unchanged.
+
+Authenticated candles are built from the finest published level series that fits the window (`1min`, then `5min`, then `1hour`), and never from a series coarser than the candle. The default window is 7 days for `1min` and `5min`, 30 days for `1hour`, and 90 days for `1d`.
+
+`from` is an inclusive lower bound on the candle timestamp. `to` is exclusive. A date-only `from` is UTC midnight. A date-only `to` covers that whole UTC day (exclusive at the next UTC midnight). `page` defaults to 1. `per_page` defaults to 100 and accepts 1 through 500. `order` is `asc` or `desc` (default `desc`).
+
+On the public tier, a `1d` candle inside the last 30 days is the open, high, low, and close of the hourly levels. An older day in the 90-day window has only the published daily level, so open, high, and low equal that close.
+
+## Example
+
+`GET /api/v1/public/indices/{id}/candles?interval=1hour&order=desc`
+
+Levels 10, 14, and 9 in `[12:00, 13:00)`, then 11 and 12 in `[13:00, 14:00)`, come back as:
+
+```json
+{
+  "data": [
+    {
+      "timestamp": "2026-10-26T14:00:00Z",
+      "open": 11,
+      "high": 12,
+      "low": 11,
+      "close": 12
+    },
+    {
+      "timestamp": "2026-10-26T13:00:00Z",
+      "open": 10,
+      "high": 14,
+      "low": 9,
+      "close": 9
+    }
+  ],
+  "meta": {
+    "total": 2,
+    "page": 1,
+    "per_page": 100,
+    "total_pages": 1,
+    "has_next": false,
+    "has_prev": false
+  }
+}
+```
+
+The customer docs at [docs.adjacent.markets](https://docs.adjacent.markets) are published from the private API service, not from this worker. Those pages still need a follow-up for these four routes.

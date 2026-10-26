@@ -8,5 +8,5 @@
 		"moduleResolution": "node",
 		"types": ["@cloudflare/workers-types", "@types/service-worker-mock"]
 	},
-	"exclude": ["node_modules"]
+	"exclude": ["node_modules", "src/**/*.test.ts"]
 }

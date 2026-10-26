@@ -9,6 +9,7 @@ import Exa from 'exa-js';
 
 // Import Scrape
 import { fetchAndCombineJsonFiles } from './scrape.ts';
+import { registerCandleRoutes } from './candles/routes.ts';
 
 export interface Env {
 	EXA_API_KEY: string;
@@ -247,5 +248,7 @@ app.openapi(marketsByHeadlineRoute, async (c) => {
 		return c.json("Error processing your request. Please try again later.");
 	}
 });
+
+registerCandleRoutes(app);
 
 export default app;

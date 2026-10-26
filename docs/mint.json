@@ -34,6 +34,7 @@
     {
       "group": "API Reference",
       "pages": [
+        "candles",
         "get-apimarkets",
         "get-apinews",
         "get-apimarketsheadline",
